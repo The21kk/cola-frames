@@ -1,0 +1,12 @@
+# Phase 1: Core Infrastructure (Redis + Ingestion)
+redis>=5.0.1
+opencv-python>=4.8.0
+numpy>=1.26.0
+Pillow>=10.0.0
+python-dotenv>=1.0.0
+
+# Phase 2+: Detection Models (install after Phase 1 test)
+# ultralytics>=8.1.0
+# torch>=2.1.0
+# torchvision>=0.16.0
+# transformers>=4.35.0
