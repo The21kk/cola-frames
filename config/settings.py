@@ -41,6 +41,29 @@ WORKERS_PER_CAMERA = 2
 WORKER_QUEUE_TIMEOUT = 5  # seconds
 
 # =====================================
+# GPU & Detection Workers (Phase 2)
+# =====================================
+# GPU Device Assignment
+USE_GPU = os.getenv("USE_GPU", "True").lower() == "true"
+DEVICE_WORKER_1 = os.getenv("DEVICE_WORKER_1", "cuda:0")  # YOLOv8 + Vision Transformer
+DEVICE_WORKER_2 = os.getenv("DEVICE_WORKER_2", "cuda:0")  # Faster R-CNN + RT-DETR Lite
+
+# Model Precision & Batch Processing
+MIXED_PRECISION_FP16 = os.getenv("MIXED_PRECISION_FP16", "True").lower() == "true"
+DETECTION_BATCH_SIZE = int(os.getenv("DETECTION_BATCH_SIZE", 4))
+
+# Consensus & Voting
+CONSENSUS_IOU_THRESHOLD = float(os.getenv("CONSENSUS_IOU_THRESHOLD", 0.5))  # IoU for bbox match
+CONSENSUS_AGREEMENT_RATIO = float(os.getenv("CONSENSUS_AGREEMENT_RATIO", 1.0))  # 1.0 = all workers must agree
+
+# Detection Stream Storage
+MAX_DETECTIONS_STREAM_LENGTH = 10000  # Trim detection streams to prevent memory bloat
+DETECTIONS_STREAM_PREFIX = "detections:"
+
+# Model Caching
+MODEL_CACHE_DIR = os.getenv("MODEL_CACHE_DIR", "./model_cache")
+
+# =====================================
 # Logging
 # =====================================
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

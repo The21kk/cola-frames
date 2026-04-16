@@ -79,3 +79,23 @@ class FrameSerializer:
             Size in bytes
         """
         return len(frame_b64)
+
+
+class FrameDeserializer:
+    """
+    Wrapper class for frame deserialization operations (alias for FrameSerializer).
+    Provides compatibility with code expecting a separate Deserializer class.
+    """
+    
+    @staticmethod
+    def decode_frame_from_base64(frame_b64: bytes) -> np.ndarray:
+        """
+        Converts a Base64-encoded JPEG back to numpy frame.
+        
+        Args:
+            frame_b64: Base64-encoded JPEG bytes
+            
+        Returns:
+            OpenCV frame (BGR format, uint8)
+        """
+        return FrameSerializer.decode_frame_from_base64(frame_b64)
