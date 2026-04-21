@@ -58,25 +58,161 @@ redis-cli ping  # Debería responder "PONG"
 
 ---
 
-## Uso - Fase 1 (Testing Local)
+## Testing & Validación
 
-### Opción A: Con video local (recomendado para MVP)
+Cola-Frames incluye una suite completa de tests automatizados que validan toda la infraestructura.
+
+### Ejecutar Tests
+
+#### Phase 1 Tests (Serialización + Redis + Ingesta)
+```bash
+# CPU-only, sin GPU requerido (~5 minutos)
+pytest tests/test_phase1_infrastructure.py -v
+
+# Verificar recopilación de tests
+pytest tests/test_phase1_infrastructure.py --collect-only -q
+```
+
+**Coverage**: 13 tests
+- Frame serialization (encode/decode, compression)
+- Redis connection & health check
+- RTSP/video file ingestion
+- Stream monitoring (real-time arrivals)
+- Frame retrieval & LIFO consumption
+- Throughput analysis (100+ FPS)
+
+#### Phase 2 Tests (Detectores + Consenso + Alertas)
+```bash
+# Requiere GPU (CUDA). Si no hay GPU, los tests se skipean
+pytest tests/test_phase2_detection.py -v
+
+# Solo CPU tests (sin GPU)
+pytest tests/test_phase2_detection.py -v -m "not gpu"
+
+# Con mark de GPU
+pytest tests/test_phase2_detection.py -v -m "gpu"
+```
+
+**Coverage**: 26 tests
+- GPU/CUDA availability & device selection
+- YOLOv8+Vision Transformer detector
+- Faster R-CNN+RT-DETR detector
+- Batch processing
+- Consensus voting (IoU matching)
+- Temporal filtering & persistence
+- ROI validation (inclusion/exclusion)
+- Alert generation & severity
+- Detection store
+- Performance analysis
+- Alert statistics
+
+#### Phase 2 End-to-End Pipeline Tests
+```bash
+# Pipeline completo frame→detect→consensus→alerts
+pytest tests/test_phase2_end_to_end.py -v
+
+# Solo tests rápidos (skip @slow)
+pytest tests/test_phase2_end_to_end.py -v -m "not slow"
+```
+
+**Coverage**: 10 tests
+- Single frame pipeline
+- Multi-frame pipeline (video)
+- Pipeline robustness (empty/mixed detections)
+- Performance analysis (latency, throughput)
+- Memory stability
+
+### Ejecutar Todos los Tests
+
+```bash
+# Todos los tests (GPU tests se skipean si no CUDA)
+pytest tests/ -v
+
+# Con cobertura
+pytest tests/ -v --cov=. --cov-report=html
+
+# Solo CPU-compatible
+pytest tests/ -v -m "not gpu"
+
+# Recolectar sin ejecutar
+pytest tests/ --collect-only -q
+```
+
+### Estructura de Tests
+
+```
+tests/
+├── conftest.py                   # Fixtures compartidas
+│   ├── redis_manager
+│   ├── sample_frame / sample_frames
+│   ├── video_file (temporal)
+│   ├── synthetic_video (3 objetos)
+│   ├── gpu_available
+│   └── cleanup_gpu
+│
+├── test_phase1_infrastructure.py
+│   ├── TestFrameSerialization (3 tests)
+│   ├── TestRedisConnection (2 tests)
+│   ├── TestRTSPIngestion (2 tests)
+│   ├── TestStreamMonitoring (1 test)
+│   ├── TestStreamRetrieval (1 test)
+│   ├── TestLIFOConsumption (1 test)
+│   ├── TestThroughput (2 tests)
+│   └── TestPhase1Integration (1 test)
+│
+├── test_phase2_detection.py
+│   ├── TestGPUSupport (4 tests, @gpu)
+│   ├── TestDetectionWorkers (5 tests, @gpu)
+│   ├── TestConsensusVoting (3 tests)
+│   ├── TestTemporalFiltering (1 test)
+│   ├── TestROIValidation (2 tests)
+│   ├── TestAlertGeneration (3 tests)
+│   ├── TestDetectionStore (2 tests)
+│   ├── TestPerformance (2 tests, @gpu)
+│   ├── TestAlerting (2 tests)
+│   └── TestPhase2Integration (2 tests)
+│
+└── test_phase2_end_to_end.py
+    ├── TestSingleFramePipeline (2 tests, @gpu)
+    ├── TestMultiFramePipeline (2 tests, @gpu @slow)
+    ├── TestPipelineRobustness (3 tests, @gpu)
+    ├── TestPipelinePerformance (2 tests, @gpu @slow)
+    └── TestFullValidation (1 test, @gpu)
+```
+
+### Test Markers
+
+```bash
+# GPU tests (skip si no CUDA disponible)
+pytest tests/ -m gpu
+
+# Slow tests (~1-5s por test)
+pytest tests/ -m slow
+
+# Integration tests
+pytest tests/ -m integration
+
+# CPU-only (skip GPU tests)
+pytest tests/ -m "not gpu"
+```
+
+### Ejemplo de Uso del Sistema (Development)
 
 ```python
 from producer.rtsp_ingester import RTSPIngester
 from redis_broker.stream_manager import RedisStreamManager
+import time
 
 # Simular ingesta con video local
 ingester = RTSPIngester(
     camera_id="cam_test_01",
-    rtsp_url="video.mp4",  # OpenCV soporta archivos locales como "RTSP"
+    rtsp_url="phase2_test_video.mp4",  # O: "rtsp://192.168.1.100:554/stream"
     fps_target=5
 )
 ingester.start()
 
-# Esperar unos segundos...
-import time
-time.sleep(10)
+# Esperar ingesta
+time.sleep(5)
 
 # Verificar frames en Redis
 manager = RedisStreamManager()
@@ -90,20 +226,8 @@ if latest:
     print(f"Metadata: {latest['metadata']}")
 
 ingester.stop()
-```
 
-### Opción B: Con stream RTSP real
-
-```python
-from producer.rtsp_ingester import RTSPIngester
-
-ingester = RTSPIngester(
-    camera_id="cam_tienda",
-    rtsp_url="rtsp://192.168.1.100:554/stream",
-    fps_target=5
-)
-ingester.start()
-# El ingester corre en background...
+# Para Phase 2 (GPU), ver tests/test_phase2_end_to_end.py
 ```
 
 ---
