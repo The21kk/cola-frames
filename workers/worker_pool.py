@@ -2,7 +2,7 @@
 Worker Pool: Multi-detector thread pool for parallel inference.
 
 Manages:
-- Multiple detector instances (Worker 1: YOLOv8+ViT, Worker 2: Faster R-CNN+RT-DETR)
+- Dynamic detector instances loaded from YAML configuration
 - Frame consumption from Redis streams
 - Parallel inference on GPU
 - Detection publishing to Redis detection streams
@@ -10,7 +10,6 @@ Manages:
 
 import logging
 import threading
-import queue
 import time
 from typing import Dict, List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -23,14 +22,13 @@ from config.settings import (
     REDIS_HOST,
     REDIS_PORT,
     REDIS_DB,
-    DEVICE_WORKER_1,
-    DEVICE_WORKER_2,
     DETECTION_BATCH_SIZE,
     DETECTIONS_STREAM_PREFIX,
     MAX_DETECTIONS_STREAM_LENGTH,
+    WORKERS_CONFIG_PATH,
+    USE_GPU,
 )
-from workers.yolo_vit_detector import YOLOVitDetector
-from workers.frcnn_rtdetr_detector import FasterRCNNRtdetrDetector
+from workers.detector_factory import DetectorFactory
 
 
 logger = logging.getLogger(__name__)
@@ -50,19 +48,19 @@ class WorkerPool:
 
     def __init__(
         self,
-        num_workers: int = 2,
+        config_path: str = WORKERS_CONFIG_PATH,
         batch_size: int = DETECTION_BATCH_SIZE,
-        use_gpu: bool = True,
+        use_gpu: bool = USE_GPU,
     ):
         """
-        Initialize worker pool.
+        Initialize worker pool from configuration file.
         
         Args:
-            num_workers: Number of detector workers to create
-            batch_size: Frames to batch for inference
+            config_path: Path to workers_config.yaml (default from settings)
+            batch_size: Default batch size for workers (can be overridden in YAML)
             use_gpu: Enable GPU acceleration
         """
-        self.num_workers = num_workers
+        self.config_path = config_path
         self.batch_size = batch_size
         self.use_gpu = use_gpu
 
@@ -71,38 +69,41 @@ class WorkerPool:
         self.stream_manager = RedisStreamManager()
         self.frame_deserializer = FrameDeserializer()
 
-        # Worker instances
+        # Worker instances (dynamically loaded from YAML)
         self.workers: Dict[str, object] = {}
         self._initialize_workers()
 
-        # Threading
-        self.executor = ThreadPoolExecutor(max_workers=num_workers)
+        # Threading - use number of workers from config
+        num_workers = len(self.workers)
+        self.executor = ThreadPoolExecutor(max_workers=num_workers if num_workers > 0 else 1)
         self.running = False
         self.stop_event = threading.Event()
 
-        logger.info(f"WorkerPool initialized with {num_workers} workers")
+        logger.info(f"WorkerPool initialized with {num_workers} workers from: {config_path}")
 
     def _initialize_workers(self) -> None:
-        """Initialize detector instances."""
+        """
+        Initialize detector instances from YAML configuration.
+        
+        Uses DetectorFactory to dynamically load workers based on configuration.
+        Each worker type is instantiated with its specified parameters and device.
+        """
         try:
-            logger.info("Initializing Worker 1: YOLOv8 + Vision Transformer...")
-            self.workers["yolo_vit"] = YOLOVitDetector(
-                device=DEVICE_WORKER_1 if self.use_gpu else "cpu",
-                batch_size=self.batch_size,
-                use_fp16=True,
-            )
-
-            logger.info("Initializing Worker 2: Faster R-CNN + RT-DETR Lite...")
-            self.workers["frcnn_rtdetr"] = FasterRCNNRtdetrDetector(
-                device=DEVICE_WORKER_2 if self.use_gpu else "cpu",
-                batch_size=self.batch_size,
-                use_fp16=True,
-            )
-
-            logger.info(f"Successfully initialized {len(self.workers)} workers")
+            logger.info(f"Loading worker configuration from: {self.config_path}")
+            factory = DetectorFactory(self.config_path)
+            
+            # Create all workers defined in configuration
+            self.workers = factory.create_workers(use_gpu=self.use_gpu)
+            
+            if not self.workers:
+                logger.warning("No workers were created from configuration!")
+            else:
+                logger.info(f"✓ Successfully initialized {len(self.workers)} workers:")
+                for worker_name in self.workers.keys():
+                    logger.info(f"  - {worker_name}")
 
         except Exception as e:
-            logger.error(f"Failed to initialize workers: {e}")
+            logger.error(f"Failed to initialize workers from configuration: {e}")
             self.cleanup()
             raise
 

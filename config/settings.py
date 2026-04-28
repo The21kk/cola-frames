@@ -7,7 +7,7 @@ load_dotenv()
 # Redis Configuration
 # =====================================
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379)) # Default Redis port
 REDIS_DB = int(os.getenv("REDIS_DB", 0))
 
 # =====================================
@@ -26,7 +26,7 @@ ENSEMBLE_AGREEMENT_THRESHOLD = 0.7  # % of models that must agree
 # =====================================
 # Temporal Logic
 # =====================================
-TEMPORAL_PERSISTENCE_SECONDS = 3
+TEMPORAL_PERSISTENCE_SECONDS = 2
 
 # =====================================
 # Frame Serialization
@@ -35,18 +35,20 @@ FRAME_JPEG_QUALITY = 80  # 0-100, higher = better quality but larger size
 FRAME_FORMAT = "base64_jpeg"
 
 # =====================================
-# Worker Configuration
+# Worker Configuration (Scalable)
 # =====================================
-WORKERS_PER_CAMERA = 2
-WORKER_QUEUE_TIMEOUT = 5  # seconds
+# Path to worker configuration file (YAML)
+WORKERS_CONFIG_PATH = os.getenv(
+    "WORKERS_CONFIG_PATH",
+    os.path.join(os.path.dirname(__file__), "workers_config.yaml"),
+)
 
-# =====================================
-# GPU & Detection Workers (Phase 2)
-# =====================================
-# GPU Device Assignment
+# GPU Device Assignment (Legacy - kept for backward compatibility)
 USE_GPU = os.getenv("USE_GPU", "True").lower() == "true"
 DEVICE_WORKER_1 = os.getenv("DEVICE_WORKER_1", "cuda:0")  # YOLOv8 + Vision Transformer
 DEVICE_WORKER_2 = os.getenv("DEVICE_WORKER_2", "cuda:0")  # Faster R-CNN + RT-DETR Lite
+WORKERS_PER_CAMERA = 2  # Legacy setting
+WORKER_QUEUE_TIMEOUT = 5  # seconds
 
 # Model Precision & Batch Processing
 MIXED_PRECISION_FP16 = os.getenv("MIXED_PRECISION_FP16", "True").lower() == "true"

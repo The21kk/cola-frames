@@ -1,0 +1,41 @@
+# Worker Configuration - Scalable Multi-Detector Setup
+# 
+# Define detector workers here. Each worker will process all camera streams
+# in parallel (ensemble approach). Add or remove workers by editing this file.
+#
+# Fields:
+#   - name: Unique identifier for this worker instance
+#   - type: Detector class name (must be registered in detector_registry.py)
+#   - device: CUDA device string (e.g., "cuda:0", "cuda:1", "cpu")
+#   - batch_size: Number of frames to process in batch
+#   - parameters: Detector-specific parameters (optional)
+
+workers:
+  # Worker 1: YOLOv8 + Vision Transformer
+  - name: "yolo_vit_1"
+    type: "YOLOVitDetector"
+    device: "cuda:0"
+    batch_size: 4
+    parameters: {}
+
+  # Worker 2: Faster R-CNN + RT-DETR Lite
+  - name: "frcnn_rtdetr_1"
+    type: "FasterRCNNRtdetrDetector"
+    device: "cuda:0"
+    batch_size: 2
+    parameters: {}
+
+# Example: Scale to 3 workers with same config
+# - name: "yolo_vit_2"
+#   type: "YOLOVitDetector"
+#   device: "cuda:1"
+#   batch_size: 4
+#   parameters: {}
+
+# Example: Add a new detector type
+# - name: "custom_detector_1"
+#   type: "CustomDetector"
+#   device: "cuda:1"
+#   batch_size: 3
+#   parameters:
+#     custom_param: value
