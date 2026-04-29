@@ -1,41 +1,80 @@
-# Worker Configuration - Scalable Multi-Detector Setup
+# Worker Configuration - Scalable Multi-Model Ensemble Setup
 # 
-# Define detector workers here. Each worker will process all camera streams
-# in parallel (ensemble approach). Add or remove workers by editing this file.
+# Each worker is an ENSEMBLE of 2 different models with internal consensus voting.
+# Add or remove workers by editing this file - NO CODE CHANGES NEEDED.
 #
 # Fields:
 #   - name: Unique identifier for this worker instance
-#   - type: Detector class name (must be registered in detector_registry.py)
-#   - device: CUDA device string (e.g., "cuda:0", "cuda:1", "cpu")
-#   - batch_size: Number of frames to process in batch
-#   - parameters: Detector-specific parameters (optional)
+#   - models: List of 2 model names [model1, model2]
+#   - model_types: List of 2 model types matching the models [type1, type2]
+#   - device: CUDA device string (cuda:0, cuda:1, cpu)
+#   - batch_size: Number of frames to process in parallel
+#   - confidence_threshold: Detection confidence threshold (0.0-1.0)
+#   - parameters: Model-specific parameters (optional)
 
 workers:
-  # Worker 1: YOLOv8 + Vision Transformer
-  - name: "yolo_vit_1"
-    type: "YOLOVitDetector"
+  # Worker 1: YOLOv10 Small + Vision Transformer (Detectron2) ensemble
+  - name: "worker_1"
+    models: ["yolov10s", "vit_base_detectron2"]
+    model_types: ["yolov10", "detectron2"]
     device: "cuda:0"
     batch_size: 4
+    confidence_threshold: 0.5
     parameters: {}
 
-  # Worker 2: Faster R-CNN + RT-DETR Lite
-  - name: "frcnn_rtdetr_1"
-    type: "FasterRCNNRtdetrDetector"
+  # Worker 2: RT-DETR + Faster R-CNN (ensemble: real-time DETR vs traditional CNN)
+  - name: "worker_2"
+    models: ["rtdetr_resnet50", "fasterrcnn_resnet50_fpn"]
+    model_types: ["rt_detr", "faster_rcnn"]
     device: "cuda:0"
     batch_size: 2
+    confidence_threshold: 0.5
     parameters: {}
 
-# Example: Scale to 3 workers with same config
-# - name: "yolo_vit_2"
-#   type: "YOLOVitDetector"
+# ============================================================================
+# EXAMPLES: Easily add more workers without code changes
+# ============================================================================
+
+# Example: Add YOLOv10 nano (lightweight) on GPU 1
+# - name: "yolov10_nano_2"
+#   model_type: "yolov10"
+#   model_name: "yolov10n"
 #   device: "cuda:1"
-#   batch_size: 4
+#   batch_size: 8
+#   confidence_threshold: 0.5
 #   parameters: {}
 
-# Example: Add a new detector type
-# - name: "custom_detector_1"
-#   type: "CustomDetector"
+# Example: Add YOLOv10 large on GPU 1
+# - name: "yolov10_large_1"
+#   model_type: "yolov10"
+#   model_name: "yolov10l"
 #   device: "cuda:1"
-#   batch_size: 3
-#   parameters:
-#     custom_param: value
+#   batch_size: 2
+#   confidence_threshold: 0.5
+#   parameters: {}
+
+# Example: Add RT-DETR (Real-Time DETR) on CPU
+# - name: "rtdetr_resnet50_cpu"
+#   model_type: "rt_detr"
+#   model_name: "rtdetr_resnet50"
+#   device: "cpu"
+#   batch_size: 1
+#   confidence_threshold: 0.5
+#   parameters: {}
+
+# Example: Add Faster R-CNN on GPU 1
+# - name: "frcnn_resnet101_1"
+#   model_type: "faster_rcnn"
+#   model_name: "fasterrcnn_resnet101_fpn"
+#   device: "cuda:1"
+#   batch_size: 2
+#   confidence_threshold: 0.5
+#   parameters: {}
+
+# ============================================================================
+# NOTES:
+# - All workers process all camera streams in ensemble (consensus voting)
+# - Default confidence_threshold: 0.5 (50% confidence minimum)
+# - Batch size affects GPU memory usage and throughput
+# - Device format: "cuda:0", "cuda:1", "cpu"
+# ============================================================================

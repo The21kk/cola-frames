@@ -155,24 +155,44 @@ def video_file(tmp_path):
 
 
 @pytest.fixture
-def synthetic_video(tmp_path):
+def synthetic_video():
     """
-    Create synthetic video with 3 moving objects for Phase 2 testing.
+    Load real camera video for Phase 2 testing.
     
-    Objects:
-    - Red rectangle (moving left-to-right)
-    - Green circle (moving top-to-bottom)
-    - Blue rectangle (static)
+    Real video specs:
+    - File: 2026-04-21-hallmeds.mp4
+    - Resolution: 720x1280 (portrait mode)
+    - FPS: 12
+    - Duration: 38 seconds
+    - Content: Real hallway footage with persons
     
-    Specs:
-    - Duration: 3 seconds @ 30 FPS = 90 frames
-    - Resolution: 640x480
+    This replaces the synthetic video to test with real camera data.
     """
+    # Path to real video in project root
+    real_video_path = Path(__file__).parent.parent / "2026-04-21-hallmeds.mp4"
+    
+    if not real_video_path.exists():
+        logger.warning(f"Real video not found at {real_video_path}")
+        logger.warning("Falling back to synthetic video generation")
+        # Fallback: generate synthetic video if real one not available
+        return _generate_fallback_synthetic_video()
+    
+    logger.info(f"✓ Using real camera video: {real_video_path}")
+    logger.info(f"  (720x1280, 12 FPS, 38s, hallway footage)")
+    
+    yield real_video_path
+
+
+def _generate_fallback_synthetic_video():
+    """Generate synthetic video as fallback if real video not available."""
+    import tempfile
+    
+    tmp_path = Path(tempfile.mkdtemp())
     video_path = tmp_path / "synthetic_phase2.mp4"
     
     frame_width, frame_height = 640, 480
-    fps = 30
-    duration_seconds = 3
+    fps = 12
+    duration_seconds = 5
     total_frames = fps * duration_seconds
     
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -184,16 +204,16 @@ def synthetic_video(tmp_path):
             frame = np.zeros((frame_height, frame_width, 3), dtype=np.uint8)
             frame[:, :] = (40, 40, 40)
             
-            # Red rectangle (moving left-to-right)
-            x1 = int(50 + (frame_idx % total_frames) / total_frames * 400)
+            # Red rectangle (moving left-to-right, simulating person)
+            x1 = int(50 + (frame_idx / total_frames) * 400)
             y1 = 100
             x2 = x1 + 80
             y2 = y1 + 100
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), -1)  # Red
             
-            # Green circle (moving top-to-bottom)
+            # Green circle (moving top-to-bottom, simulating person)
             cx = 150
-            cy = int(50 + (frame_idx % total_frames) / total_frames * 350)
+            cy = int(50 + (frame_idx / total_frames) * 350)
             cv2.circle(frame, (cx, cy), 40, (0, 255, 0), -1)  # Green
             
             # Blue rectangle (static)
@@ -212,11 +232,11 @@ def synthetic_video(tmp_path):
             
             out.write(frame)
         
-        logger.info(f"Created synthetic video: {video_path} ({total_frames} frames @ {fps} FPS)")
+        logger.info(f"Generated fallback synthetic video: {video_path} ({total_frames} frames @ {fps} FPS)")
     finally:
         out.release()
     
-    yield video_path
+    return video_path
 
 
 # ============================================================================

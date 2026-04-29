@@ -31,8 +31,7 @@ from config.settings import (
 from redis_broker.stream_manager import RedisStreamManager
 from producer.frame_serializer import FrameSerializer
 from workers.base_detector import BaseDetector
-from workers.yolo_vit_detector import YOLOVitDetector
-from workers.frcnn_rtdetr_detector import FasterRCNNRtdetrDetector
+from workers.generic_detector import GenericDetector
 from rules_engine.detection_store import DetectionStore
 from rules_engine.temporal_filter import TemporalFilter
 from rules_engine.roi_validator import ROIValidator
@@ -88,7 +87,12 @@ class TestGPUSupport:
         logger.info("Testing GPU memory pre-allocation...")
 
         try:
-            detector = YOLOVitDetector(device=DEVICE_WORKER_1)
+            detector = GenericDetector(
+                model_types="yolov10",
+                model_names="yolov10m",
+                device=DEVICE_WORKER_1,
+                batch_size=4,
+            )
             assert detector.device is not None
 
             # Verify tensors are on correct device
@@ -115,12 +119,14 @@ class TestDetectionWorkers:
         logger.info("Testing YOLOv8 + ViT initialization...")
 
         try:
-            detector = YOLOVitDetector(
-                device=DEVICE_WORKER_1 if torch.cuda.is_available() else "cpu"
+            detector = GenericDetector(
+                model_types="yolov10",
+                model_names="yolov10m",
+                device=DEVICE_WORKER_1 if torch.cuda.is_available() else "cpu",
+                batch_size=4,
             )
-            assert detector.model_name == "yolo_vit"
-            assert detector.yolo_model is not None
-            assert detector.vit_model is not None
+            assert detector.model_name is not None
+            assert len(detector.models) == 2
             logger.info(f"✓ YOLOv8 + ViT initialized on {detector.device}")
             detector.cleanup()
         except ImportError as e:
@@ -132,11 +138,14 @@ class TestDetectionWorkers:
         logger.info("Testing Faster R-CNN + RT-DETR initialization...")
 
         try:
-            detector = FasterRCNNRtdetrDetector(
-                device=DEVICE_WORKER_2 if torch.cuda.is_available() else "cpu"
+            detector = GenericDetector(
+                model_types="faster_rcnn",
+                model_names="fasterrcnn_resnet50_fpn",
+                device=DEVICE_WORKER_2 if torch.cuda.is_available() else "cpu",
+                batch_size=2,
             )
-            assert detector.model_name == "frcnn_rtdetr"
-            assert detector.frcnn_model is not None
+            assert detector.model_name is not None
+            assert len(detector.models) == 2
             logger.info(f"✓ Faster R-CNN + RT-DETR initialized on {detector.device}")
             detector.cleanup()
         except ImportError as e:
@@ -148,8 +157,11 @@ class TestDetectionWorkers:
         logger.info("Testing YOLOv8 + ViT detection...")
 
         try:
-            detector = YOLOVitDetector(
-                device=DEVICE_WORKER_1 if torch.cuda.is_available() else "cpu"
+            detector = GenericDetector(
+                model_types="yolov10",
+                model_names="yolov10m",
+                device=DEVICE_WORKER_1 if torch.cuda.is_available() else "cpu",
+                batch_size=4,
             )
 
             # Run detection
@@ -179,8 +191,11 @@ class TestDetectionWorkers:
         logger.info("Testing Faster R-CNN + RT-DETR detection...")
 
         try:
-            detector = FasterRCNNRtdetrDetector(
-                device=DEVICE_WORKER_2 if torch.cuda.is_available() else "cpu"
+            detector = GenericDetector(
+                model_types="faster_rcnn",
+                model_names="fasterrcnn_resnet50_fpn",
+                device=DEVICE_WORKER_2 if torch.cuda.is_available() else "cpu",
+                batch_size=2,
             )
 
             # Run detection
@@ -206,9 +221,11 @@ class TestDetectionWorkers:
         logger.info("Testing batch detection...")
 
         try:
-            detector = YOLOVitDetector(
+            detector = GenericDetector(
+                model_types="yolov10",
+                model_names="yolov10m",
                 device=DEVICE_WORKER_1 if torch.cuda.is_available() else "cpu",
-                batch_size=4
+                batch_size=4,
             )
 
             # Run batch inference
@@ -558,8 +575,11 @@ class TestPerformance:
         logger.info("Testing detection latency...")
 
         try:
-            detector = YOLOVitDetector(
-                device=DEVICE_WORKER_1 if torch.cuda.is_available() else "cpu"
+            detector = GenericDetector(
+                model_types="yolov10",
+                model_names="yolov10m",
+                device=DEVICE_WORKER_1 if torch.cuda.is_available() else "cpu",
+                batch_size=4,
             )
 
             # Warm-up
@@ -590,9 +610,11 @@ class TestPerformance:
         logger.info("Testing single worker throughput...")
 
         try:
-            detector = YOLOVitDetector(
+            detector = GenericDetector(
+                model_types="yolov10",
+                model_names="yolov10m",
                 device=DEVICE_WORKER_1 if torch.cuda.is_available() else "cpu",
-                batch_size=4
+                batch_size=4,
             )
 
             # Process batch

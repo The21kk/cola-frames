@@ -76,6 +76,14 @@ class DetectorFactory:
         """
         Create all detector instances from configuration.
         
+        Uses GenericDetector which loads model based on model_type (yolov10, faster_rcnn, rt_detr).
+        Configuration specifies:
+        - model_type: Framework/model family (required)
+        - model_name: Specific model identifier (required)
+        - device: Device string (default: cuda:0)
+        - batch_size: Batch size (default: 4)
+        - Additional parameters passed to detector
+        
         Args:
             use_gpu: Override device setting to use GPU (if not CPU in config)
             
@@ -83,40 +91,43 @@ class DetectorFactory:
             Dictionary mapping worker_name -> detector_instance
             
         Raises:
-            ValueError: If detector type not registered
-            RuntimeError: If detector instantiation fails
+            ValueError: If config is invalid or model loading fails
         """
         workers = {}
         available_detectors = list_registered_detectors()
+        detector_class = get_detector_class("GenericDetector")
 
         for worker_config in self.config["workers"]:
             try:
                 worker_name = worker_config.get("name")
-                detector_type = worker_config.get("type")
-                device = worker_config.get("device", "cpu")
+                model_type = worker_config.get("model_type")
+                model_name = worker_config.get("model_name")
+                device = worker_config.get("device", "cuda:0" if use_gpu else "cpu")
                 batch_size = worker_config.get("batch_size", 4)
+                confidence_threshold = worker_config.get("confidence_threshold", 0.5)
                 parameters = worker_config.get("parameters", {})
 
                 # Validation
                 if not worker_name:
                     raise ValueError("Worker config must have 'name' field")
-                if not detector_type:
-                    raise ValueError("Worker config must have 'type' field")
+                if not model_type:
+                    raise ValueError("Worker config must have 'model_type' field (e.g., yolov10, faster_rcnn, rt_detr)")
+                if not model_name:
+                    raise ValueError("Worker config must have 'model_name' field (e.g., yolov10m, fasterrcnn_resnet50_fpn)")
 
-                if detector_type not in available_detectors:
-                    raise ValueError(
-                        f"Detector type '{detector_type}' not registered. "
-                        f"Available: {available_detectors}"
-                    )
+                # Log model info
+                logger.info(
+                    f"Creating worker: {worker_name} "
+                    f"(model: {model_type}/{model_name}, device: {device}, batch: {batch_size})"
+                )
 
-                # Get detector class from registry
-                detector_class = get_detector_class(detector_type)
-
-                # Instantiate detector
-                logger.info(f"Creating worker: {worker_name} ({detector_type}) on {device}")
+                # Instantiate GenericDetector with model parameters
                 detector_instance = detector_class(
+                    model_type=model_type,
+                    model_name=model_name,
                     device=device,
                     batch_size=batch_size,
+                    confidence_threshold=confidence_threshold,
                     **parameters,
                 )
 
@@ -127,7 +138,7 @@ class DetectorFactory:
                 logger.error(f"Failed to create worker '{worker_config.get('name', 'UNKNOWN')}': {e}")
                 raise
 
-        logger.info(f"Successfully created {len(workers)} workers")
+        logger.info(f"Successfully created {len(workers)} workers from {self.config_path}")
         return workers
 
     def get_worker_count(self) -> int:

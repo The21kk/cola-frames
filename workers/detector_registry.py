@@ -104,18 +104,19 @@ def list_registered_detectors() -> list:
 
 # Auto-register built-in detectors on import
 def _register_builtin_detectors():
-    """Auto-register available detector implementations."""
+    """
+    Auto-register available detector implementations.
+    
+    Now uses GenericDetector which is model-agnostic and scalable.
+    Model type is specified in workers_config.yaml, not via separate detector classes.
+    """
     try:
-        from workers.yolo_vit_detector import YOLOVitDetector
-        register_detector("YOLOVitDetector", YOLOVitDetector)
+        from workers.generic_detector import GenericDetector
+        register_detector("GenericDetector", GenericDetector)
+        logger.info("✓ Registered GenericDetector (scalable, model-agnostic)")
     except ImportError as e:
-        logger.warning(f"Could not import YOLOVitDetector: {e}")
-
-    try:
-        from workers.frcnn_rtdetr_detector import FasterRCNNRtdetrDetector
-        register_detector("FasterRCNNRtdetrDetector", FasterRCNNRtdetrDetector)
-    except ImportError as e:
-        logger.warning(f"Could not import FasterRCNNRtdetrDetector: {e}")
+        logger.error(f"Critical: Could not import GenericDetector: {e}")
+        raise
 
 
 # Register built-in detectors on module import

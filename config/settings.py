@@ -21,7 +21,7 @@ MAX_STREAM_LENGTH = 1000  # Keeps ~1 second of frames at 1 FPS
 # Detection Configuration
 # =====================================
 DETECTION_CONFIDENCE_THRESHOLD = 0.5
-ENSEMBLE_AGREEMENT_THRESHOLD = 0.7  # % of models that must agree
+ENSEMBLE_AGREEMENT_THRESHOLD = 0.5  # % of models that must agree
 
 # =====================================
 # Temporal Logic
@@ -55,7 +55,7 @@ MIXED_PRECISION_FP16 = os.getenv("MIXED_PRECISION_FP16", "True").lower() == "tru
 DETECTION_BATCH_SIZE = int(os.getenv("DETECTION_BATCH_SIZE", 4))
 
 # Consensus & Voting
-CONSENSUS_IOU_THRESHOLD = float(os.getenv("CONSENSUS_IOU_THRESHOLD", 0.5))  # IoU for bbox match
+CONSENSUS_IOU_THRESHOLD = float(os.getenv("CONSENSUS_IOU_THRESHOLD", 0.3))  # IoU for bbox match
 CONSENSUS_AGREEMENT_RATIO = float(os.getenv("CONSENSUS_AGREEMENT_RATIO", 1.0))  # 1.0 = all workers must agree
 
 # Detection Stream Storage

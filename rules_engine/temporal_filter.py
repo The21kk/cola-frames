@@ -63,14 +63,14 @@ class TemporalFilter:
         try:
             timestamp = time.time()
 
-            # Get detections from each worker
-            worker1_dets = worker_detections.get("yolo_vit", [])
-            worker2_dets = worker_detections.get("frcnn_rtdetr", [])
+            # Get detections from each worker (each worker is now a 2-model ensemble)
+            worker1_dets = worker_detections.get("worker_1", [])
+            worker2_dets = worker_detections.get("worker_2", [])
 
             if not worker1_dets and not worker2_dets:
                 return []
 
-            # Perform consensus matching
+            # Perform consensus matching between workers
             consensus_detections = self._match_detections_consensus(
                 camera_id,
                 worker1_dets,
@@ -166,7 +166,7 @@ class TemporalFilter:
                     "boxes": boxes1.tolist() if isinstance(boxes1, np.ndarray) else boxes1,
                     "confidences": conf1.tolist() if isinstance(conf1, np.ndarray) else list(conf1),
                     "class_ids": np.atleast_1d(det1.get("class_ids", [])).tolist(),
-                    "workers_agreed": ["yolo_vit", "frcnn_rtdetr"],
+                    "workers_agreed": ["worker_1", "worker_2"],
                     "iou_score": float(iou),
                     "avg_confidence": float(avg_conf),
                     "timestamp": timestamp,
