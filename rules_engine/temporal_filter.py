@@ -15,9 +15,9 @@ import numpy as np
 from collections import defaultdict
 
 from rules_engine.detection_store import DetectionStore
+from config import settings
 from config.settings import (
     TEMPORAL_PERSISTENCE_SECONDS,
-    CONSENSUS_IOU_THRESHOLD,
     CONSENSUS_AGREEMENT_RATIO,
 )
 
@@ -111,6 +111,17 @@ class TemporalFilter:
         Returns:
             List of consensus detections
         """
+        # Log the current threshold being used
+        logger.debug(f"Consensus matching with IoU threshold: {settings.CONSENSUS_IOU_THRESHOLD}")
+        logger.debug(f"W1 dets: {len(worker1_dets)} dict(s), W2 dets: {len(worker2_dets)} dict(s)")
+        
+        if worker1_dets:
+            w1_boxes_count = len(np.atleast_1d(worker1_dets[0].get('boxes', [])))
+            logger.debug(f"  W1[0] structure: {w1_boxes_count} boxes")
+        if worker2_dets:
+            w2_boxes_count = len(np.atleast_1d(worker2_dets[0].get('boxes', [])))
+            logger.debug(f"  W2[0] structure: {w2_boxes_count} boxes")
+        
         consensus_dets = []
 
         # If either worker has no detections, return empty or only the other's detections
@@ -136,6 +147,7 @@ class TemporalFilter:
 
             best_match = None
             best_iou = 0
+            all_ious = []  # Track all IoUs tried
 
             for idx2, det2 in enumerate(worker2_dets):
                 if idx2 in used_worker2_indices:
@@ -147,10 +159,21 @@ class TemporalFilter:
 
                 # Calculate IoU between first detection in each
                 iou = self._calculate_iou(boxes1[0], boxes2[0])
+                all_ious.append(iou)
 
-                if iou > best_iou and iou >= CONSENSUS_IOU_THRESHOLD:
+                if iou > best_iou and iou >= settings.CONSENSUS_IOU_THRESHOLD:
                     best_iou = iou
                     best_match = (idx2, iou)
+            
+            # Log why match succeeded or failed
+            if all_ious:
+                max_iou_available = max(all_ious)
+                threshold = settings.CONSENSUS_IOU_THRESHOLD
+                logger.debug(
+                    f"W1[{idx1}] vs W2: best_iou={max_iou_available:.3f}, "
+                    f"threshold={threshold:.2f}, "
+                    f"match={'YES' if best_match else 'NO'}"
+                )
 
             if best_match is not None:
                 idx2, iou = best_match

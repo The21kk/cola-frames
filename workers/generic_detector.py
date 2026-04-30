@@ -141,6 +141,13 @@ class GenericDetector(BaseDetector):
         
         logger.info(f"✓ Ensemble initialized: {self.model_types[0]} + {self.model_types[1]}")
 
+    def _set_inference_mode(self) -> None:
+        """Set all models to evaluation mode and disable gradients."""
+        for model in self.models:
+            model.eval()
+        torch.set_grad_enabled(False)
+        logger.info("✓ All models set to evaluation mode")
+
     def _load_yolov10(self, model_name: str) -> Tuple:
         """Load YOLOv10 model."""
         from ultralytics import YOLO
@@ -361,12 +368,22 @@ class GenericDetector(BaseDetector):
         scores = prediction["scores"].cpu().numpy()
         labels = prediction["labels"].cpu().numpy()
         
-        for box, score, label in zip(boxes, scores, labels):
-            if score >= self.confidence_threshold and label == self.class_filter:
+        # Debug: log raw predictions
+        if len(scores) > 0:
+            logger.debug(f"RCNN raw: {len(scores)} total detections, unique labels: {np.unique(labels)}, "
+                        f"top score: {scores[0]:.3f}, threshold: {self.confidence_threshold}")
+        
+        # For torchvision COCO models: person is class 1 (not 0)
+        person_label = 1 if self.class_filter == 0 else self.class_filter
+        accepted_count = 0
+        
+        for idx, (box, score, label) in enumerate(zip(boxes, scores, labels)):
+            if score >= self.confidence_threshold and label == person_label:
                 x1, y1, x2, y2 = box
                 boxes_list.append(np.array([x1, y1, x2, y2], dtype=np.float32))
                 conf_list.append(score)
                 class_list.append(label)
+                accepted_count += 1
         
         return boxes_list, conf_list, class_list
 

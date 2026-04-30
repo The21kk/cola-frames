@@ -1,25 +1,25 @@
 {
-  "timestamp": "2026-04-29T13:13:33.709613",
+  "timestamp": "2026-04-30T13:23:38.872691",
   "summary": {
     "total_frames": 0,
     "frames_ingested": 0,
     "frames_processed": 468,
     "total_detections_w1": 1541,
-    "total_detections_w2": 0,
-    "total_consensus_detections": 0,
-    "total_alerts": 0,
+    "total_detections_w2": 2462,
+    "total_consensus_detections": 243,
+    "total_alerts": 243,
     "processing_failures": 0
   },
   "timing_analysis": {
     "avg_ingestion_ms": 0,
-    "avg_processing_ms": 108.29752072309836,
-    "fps_achieved": 9.2338217285404
+    "avg_processing_ms": 214.36992873493423,
+    "fps_achieved": 4.664833383587526
   },
   "detection_stats": {
     "avg_w1_detections_per_frame": 3.2927350427350426,
-    "avg_w2_detections_per_frame": 0.0,
-    "consensus_agreement_pct": 0.0,
-    "alerts_per_frame": 0.0
+    "avg_w2_detections_per_frame": 5.260683760683761,
+    "consensus_agreement_pct": 6.07044716462653,
+    "alerts_per_frame": 0.5192307692307693
   },
   "failures": []
 }
