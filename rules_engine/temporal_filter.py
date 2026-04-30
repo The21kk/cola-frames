@@ -136,64 +136,71 @@ class TemporalFilter:
         if not worker1_dets and not worker2_dets:
             return []
 
-        # Match worker1 detections with worker2
+        # Match worker1 detections with worker2 by comparing individual boxes
         matched_pairs = []
-        used_worker2_indices = set()
+        used_w2_box_indices = set()
 
+        # Flatten boxes from worker detections into per-box entries
+        w1_boxes = []  # list of (orig_det_idx, box_idx, box, conf, class_id)
         for idx1, det1 in enumerate(worker1_dets):
-            boxes1 = np.array(det1.get("boxes", []))
-            if len(boxes1) == 0:
+            boxes_list = det1.get("boxes", [])
+            if not boxes_list:
                 continue
+            boxes_arr = np.array(boxes_list)
+            confs = np.atleast_1d(np.array(det1.get("confidences", [])))
+            class_ids = np.atleast_1d(np.array(det1.get("class_ids", [])))
+            for b_idx in range(len(boxes_arr)):
+                box = boxes_arr[b_idx]
+                conf = confs[b_idx] if b_idx < len(confs) else 0.0
+                cls = int(class_ids[b_idx]) if b_idx < len(class_ids) else None
+                w1_boxes.append((idx1, b_idx, box, conf, cls))
 
-            best_match = None
-            best_iou = 0
-            all_ious = []  # Track all IoUs tried
+        w2_boxes = []
+        for idx2, det2 in enumerate(worker2_dets):
+            boxes_list = det2.get("boxes", [])
+            if not boxes_list:
+                continue
+            boxes_arr = np.array(boxes_list)
+            confs = np.atleast_1d(np.array(det2.get("confidences", [])))
+            class_ids = np.atleast_1d(np.array(det2.get("class_ids", [])))
+            for b_idx in range(len(boxes_arr)):
+                box = boxes_arr[b_idx]
+                conf = confs[b_idx] if b_idx < len(confs) else 0.0
+                cls = int(class_ids[b_idx]) if b_idx < len(class_ids) else None
+                w2_boxes.append((idx2, b_idx, box, conf, cls))
 
-            for idx2, det2 in enumerate(worker2_dets):
-                if idx2 in used_worker2_indices:
+        # Greedy matching: for each W1 box find best unmatched W2 box
+        for i, (orig1_idx, b1_idx, box1, conf1, cls1) in enumerate(w1_boxes):
+            best_j = None
+            best_iou = 0.0
+            for j, (orig2_idx, b2_idx, box2, conf2, cls2) in enumerate(w2_boxes):
+                if j in used_w2_box_indices:
                     continue
-
-                boxes2 = np.array(det2.get("boxes", []))
-                if len(boxes2) == 0:
-                    continue
-
-                # Calculate IoU between first detection in each
-                iou = self._calculate_iou(boxes1[0], boxes2[0])
-                all_ious.append(iou)
-
+                iou = self._calculate_iou(box1, box2)
                 if iou > best_iou and iou >= settings.CONSENSUS_IOU_THRESHOLD:
                     best_iou = iou
-                    best_match = (idx2, iou)
-            
-            # Log why match succeeded or failed
-            if all_ious:
-                max_iou_available = max(all_ious)
-                threshold = settings.CONSENSUS_IOU_THRESHOLD
-                logger.debug(
-                    f"W1[{idx1}] vs W2: best_iou={max_iou_available:.3f}, "
-                    f"threshold={threshold:.2f}, "
-                    f"match={'YES' if best_match else 'NO'}"
-                )
+                    best_j = j
 
-            if best_match is not None:
-                idx2, iou = best_match
-                used_worker2_indices.add(idx2)
+            logger.debug(
+                f"W1[{i}] vs W2: best_iou={best_iou:.3f}, threshold={settings.CONSENSUS_IOU_THRESHOLD:.2f}, match={'YES' if best_j is not None else 'NO'}"
+            )
 
-                # Ensure confidences are lists/arrays for concatenation
-                conf1 = np.atleast_1d(det1.get("confidences", []))
-                conf2 = np.atleast_1d(det2.get("confidences", []))
-                avg_conf = np.mean(np.concatenate([conf1, conf2]))
+            if best_j is not None:
+                used_w2_box_indices.add(best_j)
+                (_, _, box2, conf2, cls2) = w2_boxes[best_j]
 
-                # Create consensus detection
+                avg_conf = float(np.mean([conf1, conf2]))
+
                 consensus_det = {
-                    "boxes": boxes1.tolist() if isinstance(boxes1, np.ndarray) else boxes1,
-                    "confidences": conf1.tolist() if isinstance(conf1, np.ndarray) else list(conf1),
-                    "class_ids": np.atleast_1d(det1.get("class_ids", [])).tolist(),
+                    "boxes": [box1.tolist()],
+                    "confidences": [float(conf1)],
+                    "class_ids": [int(cls1) if cls1 is not None else None],
                     "workers_agreed": ["worker_1", "worker_2"],
-                    "iou_score": float(iou),
-                    "avg_confidence": float(avg_conf),
+                    "iou_score": float(best_iou),
+                    "avg_confidence": avg_conf,
                     "timestamp": timestamp,
                     "camera_id": camera_id,
+                    "num_detections": 1,
                 }
                 consensus_dets.append(consensus_det)
 
